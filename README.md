@@ -630,6 +630,7 @@ Ref for adding fast network:
 
 
 -------------------------------
+Retirei do site: http://quuxfu.blogspot.com/2016/11/add-shared-ssd-drive-to-rocks-cluster.html
 Add shared SSD drive to Rocks cluster:
 
 Problem: You might want to add an SSD drive to speed up procedures that have a lot of disk I/O.  What follows is a description of just one way to do this.  If you are clever, you can probably manage without any restarts.  I am not so clever.  The description assumes that the cluster is named "MyCluster" and the SSD drive is named "SSDscratch". You will need to be root.
