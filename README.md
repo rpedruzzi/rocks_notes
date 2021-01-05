@@ -627,3 +627,62 @@ rocks sync host network hyades
 Ref for adding fast network:
 
 [http://central-7-0-x86-64.rocksclusters.org/roll-documentation/base/7.0/x1403.html#AEN1410](http://central-7-0-x86-64.rocksclusters.org/roll-documentation/base/7.0/x1403.html#AEN1410)
+
+
+-------------------------------
+Add shared SSD drive to Rocks cluster:
+
+Problem: You might want to add an SSD drive to speed up procedures that have a lot of disk I/O.  What follows is a description of just one way to do this.  If you are clever, you can probably manage without any restarts.  I am not so clever.  The description assumes that the cluster is named "MyCluster" and the SSD drive is named "SSDscratch". You will need to be root.
+Solution:
+1. Plug in the drive to the head node. Reboot.
+2. List disks and their partitions:
+/sbin/fdisk -l
+3. Find your new SSD drive in the output. In my case it was called "/dev/sdb". It probably needs to be partitioned and formatted so fdisk may say something like "Disk /dev/sdb doesn't contain a valid partition table."
+4. Partition the disk
+/sbin/fdisk /dev/sdb
+     Follow menu items:
+     >n (create a new partition)
+        >p (primary partition)
+           >1 (partition number)
+              >accept defaults to make the entire disk a single partition
+     >w (write the new partition)
+5. Verify that the partition table for the SSD is how you want it:
+/sbin/fdisk -l
+6. Find out what disk format other volumes on the head node are using (ext3, ext4, etc).
+df -T
+7. Format the SSD similarly.  I will use ext3.
+/sbin/mkfs.ext3 /dev/sdb1
+8. Create a mount point, make it writable by everyone, mount the disk, verify it mounted. It's a good idea to keep it in the /export/home directory since that is a place that Rocks likes to share.
+mkdir /export/home/SSDscratch
+chmod a+w /export/home/SSDscratch
+mount /dev/sdb1 /export/home/SSDscratch
+df -T
+9. Modify /etc/exports so NFS shares the new mount:
+cp /etc/exports /etc/exportsORIG #backup the original file
+vi /etc/exports
+     Using vi (or whatever you like), add line like:"/export/home/SSDscratch 10.1.1.1(rw,async,no_root_squash) 10.1.0.0/255.255.0.0(rw,async)"
+10. Modify /etc/auto.share:
+cp /etc/auto.share /etc/auto.shareORIG
+vi /etc/auto.share
+     Add line like:"SSDscratch MyCluster.local:/export/home/SSDscratch"
+11. Modify /etc/auto.home:
+cp /etc/auto.home /etc/auto.homeORIG
+vi /etc/auto.home
+     Add line like:"SSDscratch    -nfsvers=3      MyCluster.local:/export/home/SSDscratch"
+12. Modify /etc/fstab so it automatically mounts:
+cp /etc/fstab /etc/fstabORIG
+vi /etc/fstab
+     Add line like:"/dev/sdb1     /export/home/SSDscratch     ext3     defaults     0 0"
+13. Restart NFS and sync cluster. This sends the modified files to all nodes:
+/sbin/service nfs restart
+rocks sync users
+14. To load the new settings on the nodes, I had to reboot them:
+rocks run host 'reboot'
+15. To verify that the SSD is mounted automatically, reboot the head node. (If it won't reboot, the problem is likely in the /etc/fstab file. Revert /etc/fstab to /etc/fstabORIG by booting from a live disk and try again.):
+reboot
+16. Verify that the SSD directory is mounted on all nodes. It should mount at /home/SSDscratch:
+rocks run host compute 'hostname; ls -l /home/SSDscratch'
+     If not, rocks sync users again and reboot. You may have to reboot twice for unknown reasons.
+
+Congratulate yourself. That was a lot of work.
+
